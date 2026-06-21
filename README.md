@@ -1,5 +1,5 @@
 
-```markdown
+```
 # GLYPH
 
 **G**enerate **L**ettering **Y**ielding **P**ixel-art & **H**ues
