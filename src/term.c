@@ -6,6 +6,25 @@
 #include <time.h>
 #include <math.h>
 #include <stdint.h>
+
+#ifdef _WIN32
+#include <windows.h>
+
+int term_width(void) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+        return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    }
+    return 80;
+}
+
+static void enable_windows_ansi(void) {
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    GetConsoleMode(hOut, &mode);
+    SetConsoleMode(hOut, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+}
+#else
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -17,12 +36,14 @@ int term_width(void) {
     return 80;
 }
 
+static void enable_windows_ansi(void) {} // no-op di Linux/macOS
+#endif
+
 // warna internal 64-bit: 16-bit per channel (R,G,B,A)
 typedef struct {
     uint16_t r, g, b, a;
 } Color64;
 
-// HSV ke RGB presisi 16-bit per channel
 static Color64 hsv_to_rgb64(float h, float s, float v) {
     float c = v * s;
     float x = c * (1 - fabsf(fmodf(h / 60.0f, 2) - 1));
@@ -44,7 +65,6 @@ static Color64 hsv_to_rgb64(float h, float s, float v) {
     return col;
 }
 
-// downscale 16-bit channel -> 8-bit buat dikirim ke terminal (ANSI 24-bit)
 static inline int to8(uint16_t v) {
     return v >> 8;
 }
@@ -67,7 +87,7 @@ static Color64 style_color(RenderOptions *opts, int char_index, int total_chars)
         }
         case STYLE_GRADIENT: {
             float t = (total_chars > 1) ? (float)char_index / (total_chars - 1) : 0;
-            uint16_t base = (uint16_t)(opts->fg_color * 257); // 8-bit -> 16-bit
+            uint16_t base = (uint16_t)(opts->fg_color * 257);
             col.r = (uint16_t)(base + t * (65535 - base));
             col.g = (uint16_t)(base + t * (65535 - base));
             col.b = (uint16_t)(base + t * (65535 - base));
@@ -89,6 +109,8 @@ static Color64 style_color(RenderOptions *opts, int char_index, int total_chars)
 }
 
 int render_text(Font *font, const char *text, RenderOptions *opts) {
+    enable_windows_ansi();
+
     int len = strlen(text);
     if (len == 0) return -1;
 
@@ -121,7 +143,7 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
 
             while (byte_i < rowbytes) {
                 int seq = utf8_seqlen((unsigned char)rowstr[byte_i]);
-                if (seq > 64) seq = 1; // safety, buffer 64 byte
+                if (seq > 64) seq = 1;
 
                 if (!(seq == 1 && rowstr[byte_i] == ' ')) {
                     Color64 col = style_color(opts, i, len);
