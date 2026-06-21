@@ -3,6 +3,7 @@
 
 #include "font.h"
 #include <stdint.h>
+#include <stdio.h>
 
 typedef enum {
     STYLE_PLAIN,
@@ -23,10 +24,11 @@ typedef struct {
     RGB grad_from;
     RGB grad_to;
     int use_border;
-    float hue_offset;   // buat animasi wave, geser rainbow tiap frame
+    float hue_offset;
 } RenderOptions;
 
 int term_width(void);
 int render_text(Font *font, const char *text, RenderOptions *opts);
+int render_text_to_stream(Font *font, const char *text, RenderOptions *opts, FILE *stream);
 
 #endif

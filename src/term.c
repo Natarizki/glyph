@@ -67,14 +67,6 @@ static RGB lerp_rgb(RGB a, RGB b, float t) {
     return out;
 }
 
-static void set_fg_rgb(RGB c) {
-    printf("\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
-}
-
-static void reset_color(void) {
-    printf("\033[0m");
-}
-
 static RGB style_color(RenderOptions *opts, int char_index, int total_chars) {
     switch (opts->style) {
         case STYLE_RAINBOW: {
@@ -99,9 +91,7 @@ static RGB style_color(RenderOptions *opts, int char_index, int total_chars) {
     }
 }
 
-int render_text(Font *font, const char *text, RenderOptions *opts) {
-    enable_windows_ansi();
-
+int render_text_to_stream(Font *font, const char *text, RenderOptions *opts, FILE *stream) {
     int len = strlen(text);
     if (len == 0) return -1;
 
@@ -109,20 +99,20 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
     int total_width = 0;
     for (int i = 0; i < len; i++) {
         Glyph *g = font_get_glyph(font, (unsigned char)text[i]);
-        if (g) total_width += g->width + 1; // +1 buat kerning antar karakter
+        if (g) total_width += g->width + 1;
     }
     if (opts->use_border) total_width += 4;
 
     if (opts->style == STYLE_GAY) srand((unsigned int)time(NULL));
 
     if (opts->use_border) {
-        printf("+");
-        for (int x = 0; x < total_width - 2; x++) printf("-");
-        printf("+\n");
+        fprintf(stream, "+");
+        for (int x = 0; x < total_width - 2; x++) fprintf(stream, "-");
+        fprintf(stream, "+\n");
     }
 
     for (int row = 0; row < height; row++) {
-        if (opts->use_border) printf("| ");
+        if (opts->use_border) fprintf(stream, "| ");
 
         for (int i = 0; i < len; i++) {
             Glyph *g = font_get_glyph(font, (unsigned char)text[i]);
@@ -138,29 +128,32 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
 
                 if (!(seq == 1 && rowstr[byte_i] == ' ')) {
                     RGB col = style_color(opts, i, len);
-                    set_fg_rgb(col);
+                    fprintf(stream, "\033[38;2;%d;%d;%dm", col.r, col.g, col.b);
 
-                    char cell[64] = {0};
-                    memcpy(cell, &rowstr[byte_i], seq);
-                    fwrite(cell, 1, seq, stdout);
-                    reset_color();
+                    fwrite(&rowstr[byte_i], 1, seq, stream);
+                    fprintf(stream, "\033[0m");
                 } else {
-                    putchar(' ');
+                    fputc(' ', stream);
                 }
                 byte_i += seq;
             }
 
-            putchar(' '); // kerning: jarak antar karakter
+            fputc(' ', stream);
         }
 
-        if (opts->use_border) printf(" |");
-        printf("\n");
+        if (opts->use_border) fprintf(stream, " |");
+        fprintf(stream, "\n");
     }
 
     if (opts->use_border) {
-        printf("+");
-        for (int x = 0; x < total_width - 2; x++) printf("-");
-        printf("+\n");
+        fprintf(stream, "+");
+        for (int x = 0; x < total_width - 2; x++) fprintf(stream, "-");
+        fprintf(stream, "+\n");
     }
     return 0;
+}
+
+int render_text(Font *font, const char *text, RenderOptions *opts) {
+    enable_windows_ansi();
+    return render_text_to_stream(font, text, opts, stdout);
 }

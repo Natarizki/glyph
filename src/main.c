@@ -11,7 +11,7 @@
 #include "anim.h"
 #include "fetch_fonts.h"
 
-#define GLYPH_VERSION "1.1.0"
+#define GLYPH_VERSION "1.2.0"
 
 static void print_usage(const char *prog) {
     printf("GLYPH - Generate Lettering Yielding Pixel-art & Hues\n\n");
@@ -27,6 +27,7 @@ static void print_usage(const char *prog) {
     printf("  -F, --style    plain|gradient|rainbow|gay|border\n");
     printf("  --color        preset name (orange, purple, pink, ...) or hex (#ff5500)\n");
     printf("  --gradient     from:to, e.g. orange:purple or #ff0000:#0000ff\n");
+    printf("  --output       save rendered output (with ANSI color) to a file\n");
     printf("\nAnimation:\n");
     printf("  --anim         typewriter|wave\n");
     printf("  --speed        delay per frame in ms (default 100)\n");
@@ -108,6 +109,7 @@ int main(int argc, char **argv) {
         char *font_arg = NULL;
         char *text = NULL;
         char *anim_mode = NULL;
+        char *output_path = NULL;
         int anim_speed = 100;
         int anim_loops = 0;
 
@@ -157,6 +159,8 @@ int main(int argc, char **argv) {
                 anim_speed = atoi(argv[++i]);
             } else if (strcmp(argv[i], "--loops") == 0 && i + 1 < argc) {
                 anim_loops = atoi(argv[++i]);
+            } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
+                output_path = argv[++i];
             } else if (!text) {
                 text = argv[i];
             }
@@ -194,6 +198,18 @@ int main(int argc, char **argv) {
                 return 1;
             }
             return 0;
+        }
+
+        if (output_path) {
+            FILE *out_file = fopen(output_path, "w");
+            if (!out_file) {
+                fprintf(stderr, "failed to open output file: %s\n", output_path);
+                return 1;
+            }
+            int result = render_text_to_stream(&font, text, &opts, out_file);
+            fclose(out_file);
+            printf("Output saved to: %s\n", output_path);
+            return result;
         }
 
         return render_text(&font, text, &opts);
