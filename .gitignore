@@ -61,3 +61,5 @@ dkms.conf
 # debug information files
 *.dwo
 >>>>>>> 6b765a12ca0c99c9dd2992366c4a47ed8112e0cf
+
+*.txt
