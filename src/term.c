@@ -86,7 +86,6 @@ static RGB style_color(RenderOptions *opts, int char_index, int total_chars) {
             return hsv_to_rgb(hue, 1.0f, 1.0f);
         }
         case STYLE_GRADIENT: {
-            // gradasi dari fg_color ke putih
             float t = (total_chars > 1) ? (float)char_index / (total_chars - 1) : 0;
             RGB white = {255, 255, 255};
             return lerp_rgb(opts->fg_color, white, t);
@@ -110,7 +109,7 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
     int total_width = 0;
     for (int i = 0; i < len; i++) {
         Glyph *g = font_get_glyph(font, (unsigned char)text[i]);
-        if (g) total_width += g->width;
+        if (g) total_width += g->width + 1; // +1 buat kerning antar karakter
     }
     if (opts->use_border) total_width += 4;
 
@@ -150,6 +149,8 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
                 }
                 byte_i += seq;
             }
+
+            putchar(' '); // kerning: jarak antar karakter
         }
 
         if (opts->use_border) printf(" |");
