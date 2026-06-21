@@ -9,6 +9,7 @@
 #include "image.h"
 #include "color.h"
 #include "anim.h"
+#include "fetch_fonts.h"
 
 #define GLYPH_VERSION "1.1.0"
 
@@ -17,6 +18,7 @@ static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s text -f <font> \"text\" [options]\n", prog);
     printf("  %s img <image.png|jpg> [-w width] [-h height] [--no-color]\n", prog);
+    printf("  %s fetch-fonts             download popular FIGlet fonts (requires curl)\n", prog);
     printf("\nFont can be:\n");
     printf("  - direct path (./fonts/3d.flf)\n");
     printf("  - name only (3d, standard, slant) - auto-resolved from ./fonts/,\n");
@@ -96,6 +98,10 @@ int main(int argc, char **argv) {
     if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0) {
         print_version();
         return 0;
+    }
+
+    if (strcmp(argv[1], "fetch-fonts") == 0) {
+        return fetch_fonts();
     }
 
     if (strcmp(argv[1], "text") == 0) {

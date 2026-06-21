@@ -60,6 +60,7 @@ int flf_load(const char *path, Font *font) {
                 return -1;
             }
             line[strcspn(line, "\n")] = 0;
+            line[strcspn(line, "\r")] = 0;  // jaga-jaga CRLF
 
             int len = strlen(line);
             while (len > 0 && line[len - 1] == '@') {
@@ -67,7 +68,6 @@ int flf_load(const char *path, Font *font) {
                 len--;
             }
 
-            // ganti hardblank jadi spasi biasa
             for (int k = 0; k < len; k++) {
                 if (line[k] == hardblank) line[k] = ' ';
             }
@@ -77,6 +77,17 @@ int flf_load(const char *path, Font *font) {
                 font->glyphs[gi].width = len;
             }
         }
+
+        // PENTING: pad semua baris glyph ini biar sama panjang (width)
+        // biar nggak misalign pas dirender berurutan
+        for (int row = 0; row < height && row < MAX_GLYPH_HEIGHT; row++) {
+            int rl = strlen(font->glyphs[gi].rows[row]);
+            for (int p = rl; p < font->glyphs[gi].width && p < MAX_GLYPH_WIDTH; p++) {
+                font->glyphs[gi].rows[row][p] = ' ';
+            }
+            font->glyphs[gi].rows[row][font->glyphs[gi].width < MAX_GLYPH_WIDTH ? font->glyphs[gi].width : MAX_GLYPH_WIDTH] = '\0';
+        }
+
         font->glyph_count++;
     }
 
