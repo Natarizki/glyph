@@ -1,6 +1,4 @@
-```
-nano README.md
-```
+
 ```markdown
 # GLYPH
 
