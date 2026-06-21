@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
 
     steps:
       - name: Checkout repo
@@ -27,14 +27,36 @@ jobs:
         if: runner.os == 'macOS'
         run: echo "clang & make already available on macOS runner"
 
-      - name: Build
+      - name: Install build tools (Windows)
+        if: runner.os == 'Windows'
+        run: choco install mingw -y
+
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
         run: make clean && make
 
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          export PATH="/c/ProgramData/mingw64/mingw64/bin:$PATH"
+          make CC=gcc clean
+          make CC=gcc
+
       - name: Show binary info
+        if: runner.os != 'Windows'
         run: file glyph-* || true
 
-      - name: Upload binary artifact
+      - name: Upload binary artifact (Linux/macOS)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: glyph-${{ runner.os }}-${{ runner.arch }}
           path: glyph-*
+
+      - name: Upload binary artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glyph-${{ runner.os }}-${{ runner.arch }}
+          path: glyph.exe
