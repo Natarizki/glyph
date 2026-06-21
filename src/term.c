@@ -22,7 +22,7 @@ static void enable_windows_ansi(void) {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD mode = 0;
     GetConsoleMode(hOut, &mode);
-    SetConsoleMode(hOut, mode | 0x0004); // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    SetConsoleMode(hOut, mode | 0x0004);
 }
 #else
 #include <sys/ioctl.h>
@@ -36,15 +36,10 @@ int term_width(void) {
     return 80;
 }
 
-static void enable_windows_ansi(void) {} // no-op di Linux/macOS
+static void enable_windows_ansi(void) {}
 #endif
 
-// warna internal 64-bit: 16-bit per channel (R,G,B,A)
-typedef struct {
-    uint16_t r, g, b, a;
-} Color64;
-
-static Color64 hsv_to_rgb64(float h, float s, float v) {
+static RGB hsv_to_rgb(float h, float s, float v) {
     float c = v * s;
     float x = c * (1 - fabsf(fmodf(h / 60.0f, 2) - 1));
     float m = v - c;
@@ -57,55 +52,52 @@ static Color64 hsv_to_rgb64(float h, float s, float v) {
     else if (h < 300) { rf = x; gf = 0; bf = c; }
     else              { rf = c; gf = 0; bf = x; }
 
-    Color64 col;
-    col.r = (uint16_t)((rf + m) * 65535.0f);
-    col.g = (uint16_t)((gf + m) * 65535.0f);
-    col.b = (uint16_t)((bf + m) * 65535.0f);
-    col.a = 65535;
+    RGB col;
+    col.r = (uint8_t)((rf + m) * 255);
+    col.g = (uint8_t)((gf + m) * 255);
+    col.b = (uint8_t)((bf + m) * 255);
     return col;
 }
 
-static inline int to8(uint16_t v) {
-    return v >> 8;
+static RGB lerp_rgb(RGB a, RGB b, float t) {
+    RGB out;
+    out.r = (uint8_t)(a.r + t * (b.r - a.r));
+    out.g = (uint8_t)(a.g + t * (b.g - a.g));
+    out.b = (uint8_t)(a.b + t * (b.b - a.b));
+    return out;
 }
 
-static void set_fg_rgb64(Color64 c) {
-    printf("\033[38;2;%d;%d;%dm", to8(c.r), to8(c.g), to8(c.b));
+static void set_fg_rgb(RGB c) {
+    printf("\033[38;2;%d;%d;%dm", c.r, c.g, c.b);
 }
 
 static void reset_color(void) {
     printf("\033[0m");
 }
 
-static Color64 style_color(RenderOptions *opts, int char_index, int total_chars) {
-    Color64 col;
+static RGB style_color(RenderOptions *opts, int char_index, int total_chars) {
     switch (opts->style) {
         case STYLE_RAINBOW: {
-            float hue = (360.0f * char_index) / (total_chars > 1 ? total_chars : 1);
-            col = hsv_to_rgb64(hue, 1.0f, 1.0f);
-            break;
-        }
-        case STYLE_GRADIENT: {
-            float t = (total_chars > 1) ? (float)char_index / (total_chars - 1) : 0;
-            uint16_t base = (uint16_t)(opts->fg_color * 257);
-            col.r = (uint16_t)(base + t * (65535 - base));
-            col.g = (uint16_t)(base + t * (65535 - base));
-            col.b = (uint16_t)(base + t * (65535 - base));
-            col.a = 65535;
-            break;
+            float hue = fmodf((360.0f * char_index) / (total_chars > 1 ? total_chars : 1) + opts->hue_offset, 360.0f);
+            return hsv_to_rgb(hue, 1.0f, 1.0f);
         }
         case STYLE_GAY: {
             float hue = (float)(rand() % 360);
-            col = hsv_to_rgb64(hue, 1.0f, 1.0f);
-            break;
+            return hsv_to_rgb(hue, 1.0f, 1.0f);
         }
-        default: {
-            uint16_t v = (uint16_t)(opts->fg_color * 257);
-            col.r = col.g = col.b = v;
-            col.a = 65535;
+        case STYLE_GRADIENT: {
+            // gradasi dari fg_color ke putih
+            float t = (total_chars > 1) ? (float)char_index / (total_chars - 1) : 0;
+            RGB white = {255, 255, 255};
+            return lerp_rgb(opts->fg_color, white, t);
         }
+        case STYLE_CUSTOM_GRADIENT: {
+            float t = (total_chars > 1) ? (float)char_index / (total_chars - 1) : 0;
+            return lerp_rgb(opts->grad_from, opts->grad_to, t);
+        }
+        default:
+            return opts->fg_color;
     }
-    return col;
 }
 
 int render_text(Font *font, const char *text, RenderOptions *opts) {
@@ -146,8 +138,8 @@ int render_text(Font *font, const char *text, RenderOptions *opts) {
                 if (seq > 64) seq = 1;
 
                 if (!(seq == 1 && rowstr[byte_i] == ' ')) {
-                    Color64 col = style_color(opts, i, len);
-                    set_fg_rgb64(col);
+                    RGB col = style_color(opts, i, len);
+                    set_fg_rgb(col);
 
                     char cell[64] = {0};
                     memcpy(cell, &rowstr[byte_i], seq);

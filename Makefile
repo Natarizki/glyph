@@ -4,7 +4,7 @@ ARCH := $(shell uname -m)
 CFLAGS = -Wall -O2 -Iinclude
 LDFLAGS = -lm
 
-SRC = src/font.c src/flf_parser.c src/nfont_parser.c src/term.c src/image.c src/utf8.c src/main.c
+SRC = src/font.c src/flf_parser.c src/nfont_parser.c src/term.c src/image.c src/utf8.c src/color.c src/anim.c src/main.c
 OBJ = $(SRC:.c=.o)
 BIN = glyph-$(ARCH)
 

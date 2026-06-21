@@ -2,31 +2,31 @@
 #define TERM_H
 
 #include "font.h"
+#include <stdint.h>
 
 typedef enum {
     STYLE_PLAIN,
     STYLE_GRADIENT,
     STYLE_BORDER,
     STYLE_RAINBOW,
-    STYLE_GAY
+    STYLE_GAY,
+    STYLE_CUSTOM_GRADIENT
 } RenderStyle;
 
-typedef enum {
-    COL_BLACK = 0, COL_RED, COL_GREEN, COL_YELLOW,
-    COL_BLUE, COL_MAGENTA, COL_CYAN, COL_WHITE
-} TermColor;
+typedef struct {
+    uint8_t r, g, b;
+} RGB;
 
 typedef struct {
     RenderStyle style;
-    int fg_color;
-    int bg_color;
+    RGB fg_color;
+    RGB grad_from;
+    RGB grad_to;
     int use_border;
+    float hue_offset;   // buat animasi wave, geser rainbow tiap frame
 } RenderOptions;
 
-// dapatkan lebar terminal (kolom), buat keperluan image render
 int term_width(void);
-
-// render teks pakai font ke stdout, format ANSI murni
 int render_text(Font *font, const char *text, RenderOptions *opts);
 
 #endif
