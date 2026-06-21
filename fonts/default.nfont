@@ -1,0 +1,17 @@
+NFONT
+name: 3DBlock
+height: 4
+hardblank: $
+glyph: 65
+ ### 
+#...#
+#####
+#...#
+end
+glyph: 66
+#### 
+#..# 
+#### 
+#...#
+end
+end
