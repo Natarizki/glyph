@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         char *img_path = argv[2];
-        int w = 0, h = 0, use_color = 1;
+        int w = 0, h = 0, use_color = 1, loops = 0;
 
         for (int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
@@ -248,9 +248,17 @@ int main(int argc, char **argv) {
                 h = atoi(argv[++i]);
             } else if (strcmp(argv[i], "--no-color") == 0) {
                 use_color = 0;
+            } else if (strcmp(argv[i], "--loops") == 0 && i + 1 < argc) {
+                loops = atoi(argv[++i]);
             }
         }
 
+        int path_len = strlen(img_path);
+        int is_gif = (path_len > 4 && strcmp(img_path + path_len - 4, ".gif") == 0);
+
+        if (is_gif) {
+            return gif_to_ascii(img_path, w, h, use_color, loops);
+        }
         return image_to_ascii(img_path, w, h, use_color);
     }
 
