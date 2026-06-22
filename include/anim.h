@@ -3,12 +3,11 @@
 
 #include "font.h"
 #include "term.h"
+#include <stdio.h>
 
-// animasi muncul huruf satu-satu
-void anim_typewriter(Font *font, const char *text, RenderOptions *opts, int delay_ms);
-
-// animasi warna rainbow yang "berjalan" terus menerus
-// loops = jumlah iterasi (0 = infinite sampai Ctrl+C)
-void anim_wave(Font *font, const char *text, RenderOptions *opts, int speed_ms, int loops);
+void anim_typewriter(Font *font, const char *text, RenderOptions *opts, int delay_ms, FILE *output);
+void anim_wave(Font *font, const char *text, RenderOptions *opts, int speed_ms, int loops, FILE *output);
+void anim_fade(Font *font, const char *text, RenderOptions *opts, int speed_ms, int steps, FILE *output);
+void anim_bounce(Font *font, const char *text, RenderOptions *opts, int speed_ms, int loops, FILE *output);
 
 #endif

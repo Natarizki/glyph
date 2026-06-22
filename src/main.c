@@ -29,7 +29,7 @@ static void print_usage(const char *prog) {
     printf("  --gradient     from:to, e.g. orange:purple or #ff0000:#0000ff\n");
     printf("  --output       save rendered output (with ANSI color) to a file\n");
     printf("\nAnimation:\n");
-    printf("  --anim         typewriter|wave\n");
+    printf("  --anim         typewriter|wave|fade|bounce\n");
     printf("  --speed        delay per frame in ms (default 100)\n");
     printf("  --loops        number of loops for wave (0 = infinite, Ctrl+C to stop)\n");
     printf("\nOther:\n");
@@ -189,13 +189,32 @@ int main(int argc, char **argv) {
         }
 
         if (anim_mode) {
+            FILE *anim_out = NULL;
+            if (output_path) {
+                anim_out = fopen(output_path, "w");
+                if (!anim_out) {
+                    fprintf(stderr, "failed to open output file: %s\n", output_path);
+                    return 1;
+                }
+            }
+
             if (strcmp(anim_mode, "typewriter") == 0) {
-                anim_typewriter(&font, text, &opts, anim_speed);
+                anim_typewriter(&font, text, &opts, anim_speed, anim_out);
             } else if (strcmp(anim_mode, "wave") == 0) {
-                anim_wave(&font, text, &opts, anim_speed, anim_loops);
+                anim_wave(&font, text, &opts, anim_speed, anim_loops, anim_out);
+            } else if (strcmp(anim_mode, "fade") == 0) {
+                anim_fade(&font, text, &opts, anim_speed, anim_loops > 0 ? anim_loops : 20, anim_out);
+            } else if (strcmp(anim_mode, "bounce") == 0) {
+                anim_bounce(&font, text, &opts, anim_speed, anim_loops, anim_out);
             } else {
-                fprintf(stderr, "unknown animation: %s (use typewriter|wave)\n", anim_mode);
+                fprintf(stderr, "unknown animation: %s (use typewriter|wave|fade|bounce)\n", anim_mode);
+                if (anim_out) fclose(anim_out);
                 return 1;
+            }
+
+            if (anim_out) {
+                fclose(anim_out);
+                printf("Animation frames saved to: %s\n", output_path);
             }
             return 0;
         }
