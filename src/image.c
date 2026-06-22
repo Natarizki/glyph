@@ -10,9 +10,16 @@
 #ifdef _WIN32
 #include <windows.h>
 static void sleep_ms(int ms) { Sleep(ms); }
+static long long get_time_ms(void) { return (long long)GetTickCount64(); }
 #else
 #include <unistd.h>
+#include <time.h>
 static void sleep_ms(int ms) { usleep(ms * 1000); }
+static long long get_time_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 #endif
 
 static volatile int gif_keep_running = 1;
@@ -22,10 +29,19 @@ static const char *ramp = " .:-=+*#%@";
 #define RAMP_LEN 10
 
 static void render_frame_ascii(unsigned char *data, int w, int h, int out_width, int out_height, int use_color) {
+    size_t buf_size = (size_t)out_width * out_height * 24 + out_height + 64;
+    char *out_buf = malloc(buf_size);
+    if (!out_buf) return;
+
+    size_t pos = 0;
+    int last_r = -1, last_g = -1, last_b = -1;
+
     for (int oy = 0; oy < out_height; oy++) {
         int sy0 = (oy * h) / out_height;
         int sy1 = ((oy + 1) * h) / out_height;
         if (sy1 <= sy0) sy1 = sy0 + 1;
+
+        last_r = last_g = last_b = -1; // reset tiap baris baru
 
         for (int ox = 0; ox < out_width; ox++) {
             int sx0 = (ox * w) / out_width;
@@ -54,13 +70,24 @@ static void render_frame_ascii(unsigned char *data, int w, int h, int out_width,
             char c = ramp[idx];
 
             if (use_color) {
-                printf("\033[38;2;%d;%d;%dm%c\033[0m", r, g, b, c);
+                if (r != last_r || g != last_g || b != last_b) {
+                    pos += sprintf(out_buf + pos, "\033[38;2;%d;%d;%dm", r, g, b);
+                    last_r = r; last_g = g; last_b = b;
+                }
+                out_buf[pos++] = c;
             } else {
-                putchar(c);
+                out_buf[pos++] = c;
             }
         }
-        putchar('\n');
+        if (use_color) {
+            pos += sprintf(out_buf + pos, "\033[0m"); // reset sekali di akhir baris aja
+        }
+        out_buf[pos++] = '\n';
     }
+    out_buf[pos] = '\0';
+
+    fwrite(out_buf, 1, pos, stdout);
+    free(out_buf);
 }
 
 int image_to_ascii(const char *path, int out_width, int out_height, int use_color) {
@@ -83,7 +110,7 @@ int image_to_ascii(const char *path, int out_width, int out_height, int use_colo
     return 0;
 }
 
-int gif_to_ascii(const char *path, int out_width, int out_height, int use_color, int loops) {
+int gif_to_ascii(const char *path, int out_width, int out_height, int use_color, int loops, int fps) {
     FILE *f = fopen(path, "rb");
     if (!f) {
         fprintf(stderr, "gagal buka file: %s\n", path);
@@ -122,27 +149,62 @@ int gif_to_ascii(const char *path, int out_width, int out_height, int use_color,
     if (out_height <= 0) out_height = 1;
 
     signal(SIGINT, gif_handle_sigint);
-    printf("\033[?25l"); // hide cursor
+    printf("\033[?25l");
 
     int frame_size = w * h * 3;
     int loop_count = 0;
+    int target_interval_ms = (fps > 0) ? (1000 / fps) : 0;
+
+    unsigned char *blend_buf = malloc(frame_size);
+    if (!blend_buf) {
+        stbi_image_free(data);
+        free(delays);
+        return -1;
+    }
 
     while (gif_keep_running) {
         for (int fi = 0; fi < frames && gif_keep_running; fi++) {
-            printf("\033[2J\033[H"); // clear screen
-            unsigned char *frame_data = data + (fi * frame_size);
-            render_frame_ascii(frame_data, w, h, out_width, out_height, use_color);
-            fflush(stdout);
+            int next_fi = (fi + 1) % frames;
+            unsigned char *fa = data + (fi * frame_size);
+            unsigned char *fb = data + (next_fi * frame_size);
 
-            int delay_ms = delays ? delays[fi] * 10 : 100; // delay GIF biasanya dalam centiseconds
-            if (delay_ms <= 0) delay_ms = 100;
-            sleep_ms(delay_ms);
+            int base_delay = delays ? delays[fi] * 10 : 100;
+            if (base_delay <= 0) base_delay = 100;
+
+            // interpolasi dimatikan total, pakai frame asli + delay asli/target fps
+            int steps = 1;
+
+            int sub_delay = (target_interval_ms > 0) ? target_interval_ms : (base_delay / steps);
+            if (sub_delay <= 0) sub_delay = 1;
+
+            for (int s = 0; s < steps && gif_keep_running; s++) {
+                float alpha = (float)s / steps;
+
+                for (int p = 0; p < frame_size; p++) {
+                    blend_buf[p] = (unsigned char)(fa[p] * (1.0f - alpha) + fb[p] * alpha);
+                }
+
+                long long t_start = get_time_ms();
+
+                printf("\033[2J\033[H");
+                render_frame_ascii(blend_buf, w, h, out_width, out_height, use_color);
+                fflush(stdout);
+
+                long long t_end = get_time_ms();
+                long long render_time = t_end - t_start;
+
+                long long remaining = sub_delay - render_time;
+                if (remaining > 0) {
+                    sleep_ms((int)remaining);
+                }
+            }
         }
         loop_count++;
         if (loops > 0 && loop_count >= loops) break;
     }
 
-    printf("\033[?25h"); // show cursor
+    free(blend_buf);
+    printf("\033[?25h");
     stbi_image_free(data);
     free(delays);
     return 0;
