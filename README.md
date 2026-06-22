@@ -1,3 +1,4 @@
+NOTE: ALWAYS CHECK RELEASES FOR UPDATES
 # GLYPH
 
 **G**enerate **L**ettering **Y**ielding **P**ixel-art & **H**ues

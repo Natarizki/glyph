@@ -30,7 +30,7 @@ install: all
 	cp -f fonts/*.nfont $(INSTALL_FONTS)/ 2>/dev/null || true
 	cp -f fonts/*.flf $(INSTALL_FONTS)/ 2>/dev/null || true
 	@echo "Installed glyph to $(INSTALL_BIN)"
-	@echo "Alias 'gl' tersedia juga"
+	@echo "Alias 'gl' also available"
 	@echo "Installed fonts to $(INSTALL_FONTS)"
 
 uninstall:
